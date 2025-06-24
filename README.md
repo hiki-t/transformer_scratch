@@ -6,7 +6,7 @@ try to implement transformer from scratch
 
 ### performance
 - after several epochs of training on training datasets
-- 99.9% on test datasets
+- 99.0% on test datasets
 - 97.6% on train datasets (make this harder to train than test dataset)
 - still not converge, but I stopped here.
 
