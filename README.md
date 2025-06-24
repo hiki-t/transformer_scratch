@@ -1,5 +1,5 @@
 # transformer_scratch
-try to implement transformer from scratch
+try to implement a vision transformer model from scratch
 
 ### dataset
 - MNIST (e.g. ylecun/mnist on huggingface or [LINK](https://huggingface.co/datasets/ylecun/mnist))
