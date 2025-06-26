@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 from streamlit_drawable_canvas import st_canvas
 
 # this is for only using streamli app
-from model_utils import MNISTTransformerModel as mnist_model
+from model_utils import MNISTTransformerModel
+mnist_model = MNISTTransformerModel()
 
 # Page configuration
 st.set_page_config(
