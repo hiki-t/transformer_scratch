@@ -410,6 +410,6 @@ if __name__ == "__main__":
         "lr": 3e-4,
         "epochs": 12,
         "epoch_out_freq": 1, 
-        "hf_repo": # "hiki-t/tf_model_mnist", # use your own repo
+        "hf_repo": "hiki-t/tf_model_mnist", # use your own repo
     }
     main(configs)
