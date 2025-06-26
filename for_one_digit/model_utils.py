@@ -175,23 +175,8 @@ def download_and_load_weights(model, filename, repo_id="hiki-t/tf_model_mnist"):
     model.load_state_dict(torch.load(local_path, map_location="cpu", weights_only=True))
     return model
 
-class DigitSequenceDecoder(nn.Module):
-    def __init__(self, encoder_dim, hidden_dim, seq_len, num_classes=10):
-        super().__init__()
-        self.seq_len = seq_len
-        self.gru = nn.GRU(encoder_dim, hidden_dim, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, num_classes)
-
-    def forward(self, encoder_output):
-        # encoder_output: [batch, encoder_dim]
-        # Repeat encoder output for each step in the sequence
-        repeated = encoder_output.unsqueeze(1).repeat(1, self.seq_len, 1)  # [batch, seq_len, encoder_dim]
-        out, _ = self.gru(repeated)  # [batch, seq_len, hidden_dim]
-        logits = self.fc(out)        # [batch, seq_len, num_classes]
-        return logits
-
 class MNISTTransformerModel:
-    def __init__(self, model_path=".tf_model_mnist/trained_model/", seq_len=3):
+    def __init__(self, model_path=".tf_model_mnist/trained_model/"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Model configuration (should match training config)
@@ -237,13 +222,7 @@ class MNISTTransformerModel:
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))
         ])
-
-        ### this is for multi-digits
-        self.seq_len = seq_len # or any fixed number of digits
-        self.decoder = DigitSequenceDecoder(self.config["model_d"], 128, self.seq_len)
-        self.decoder.eval()
-        self.decoder.to(self.device)
-
+    
     def load_models(self):
         """Load trained model weights"""
         # try:
@@ -348,40 +327,23 @@ class MNISTTransformerModel:
             # Classification
             cls_output = transformer_output[:, 0, :]  # Take CLS token
             # print(f"DEBUG: CLS token shape: {cls_output.shape}")
-
-            ### this is for single digit image
-            # logits = self.lin_class_m(cls_output)
-            # # print(f"DEBUG: Logits shape: {logits.shape}")
             
-            # # Get probabilities and prediction
-            # probabilities = torch.softmax(logits, dim=1)
-            # prediction = torch.argmax(logits, dim=1).item()
-            # confidence = probabilities[0, prediction].item()
-
+            logits = self.lin_class_m(cls_output)
+            # print(f"DEBUG: Logits shape: {logits.shape}")
+            
+            # Get probabilities and prediction
+            probabilities = torch.softmax(logits, dim=1)
+            prediction = torch.argmax(logits, dim=1).item()
+            confidence = probabilities[0, prediction].item()
+            
             # print(f"DEBUG: Prediction: {prediction}, Confidence: {confidence:.3f}")
             
-            # return {
-            #     "prediction": prediction,
-            #     "confidence": confidence,
-            #     "probabilities": probabilities[0].cpu().numpy().tolist()
-            # }
-
-            ### this is for multiple digit image
-            seq_logits = self.decoder(cls_output)     # [batch, seq_len, 10]
-            # seq_logits: [batch, seq_len, 10]
-            probabilities = torch.softmax(seq_logits, dim=2)  # [batch, seq_len, 10]
-            predictions = torch.argmax(seq_logits, dim=2)  # [batch, seq_len]
-            # For batch=0 (first sample)
-            confidences = probabilities[0, range(seq_logits.shape[1]), predictions[0]]  # [seq_len]
-            # This gives a tensor of length seq_len, each entry is the confidence for that digit
-
             return {
-                "prediction": predictions[0].cpu().tolist(),      # e.g., [1, 2, 3]
-                "confidence": confidences,                       # e.g., [0.98, 0.87, 0.92]
-                "probabilities": probabilities[0].cpu().tolist()  # shape: [seq_len, 10]
+                "prediction": prediction,
+                "confidence": confidence,
+                "probabilities": probabilities[0].cpu().numpy().tolist()
             }
-
-
+    
     def predict_batch(self, images):
         """Predict digits from multiple images"""
         results = []
