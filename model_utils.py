@@ -221,12 +221,7 @@ class MNISTTransformerModel:
         # Load trained weights if available
         self.model_path = model_path
         self.load_models()
-        
-        # Set to evaluation mode
-        self.preprocess_model.eval()
-        self.tf_model.eval()
-        self.lin_class_m.eval()
-        
+                
         # Move to device
         self.preprocess_model.to(self.device)
         self.tf_model.to(self.device)
@@ -243,6 +238,20 @@ class MNISTTransformerModel:
         self.decoder = DigitSequenceDecoder(self.config["model_d"], 128, self.seq_len)
         self.decoder.eval()
         self.decoder.to(self.device)
+
+    def set_eval_mode(self):
+        """Set all models to evaluation mode (frozen)"""
+        self.preprocess_model.eval()
+        self.tf_model.eval()
+        self.lin_class_m.eval()
+        self.decoder.eval()
+    
+    def set_train_mode(self):
+        """Set all models to training mode (unfrozen)"""
+        self.preprocess_model.train()
+        self.tf_model.train()
+        self.lin_class_m.train()
+        self.decoder.train()
 
     def load_models(self):
         """Load trained model weights"""
@@ -327,7 +336,14 @@ class MNISTTransformerModel:
 
         # print(f"DEBUG: Final tensor shape: {image_tensor.shape}")
         return image_tensor.to(self.device)
-    
+
+    def preprocess_tensor(self, img_tensor):
+        """Preprocess tensor for model input"""
+        # Ensure tensor is on the right device
+        img_tensor = img_tensor.to(self.device)
+        
+        return img_tensor
+
     def predict(self, image):
         """Predict digit from image"""
         # print(f"DEBUG: predict() called with image type: {type(image)}")
@@ -380,7 +396,6 @@ class MNISTTransformerModel:
                 "confidence": confidences,                       # e.g., [0.98, 0.87, 0.92]
                 "probabilities": probabilities[0].cpu().tolist()  # shape: [seq_len, 10]
             }
-
 
     def predict_batch(self, images):
         """Predict digits from multiple images"""

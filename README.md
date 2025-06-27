@@ -15,3 +15,5 @@ try to implement a vision transformer model from scratch
 
 ### trained results are on wandb
 - https://wandb.ai/htsujimu-ucl/vit_mnist_from_scratch?nw=nwuserhtsujimu
+
+little bit messy with loading and saving files with tm02_toy_model_run2.py

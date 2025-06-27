@@ -6,6 +6,7 @@ import torchvision.datasets as datasets
 from einops import rearrange, reduce, repeat
 from huggingface_hub import HfApi
 from pathlib import Path
+from huggingface_hub import hf_hub_download
 
 import wandb
 import math
@@ -238,6 +239,13 @@ class DigitSequenceDecoder(nn.Module):
         logits = self.fc(out)        # [batch, seq_len, num_classes]
         return logits
 
+def download_and_load_weights(model, filename, repo_id="hiki-t/tf_model_mnist"):
+    # Download the file from Hugging Face Hub
+    local_path = hf_hub_download(repo_id=repo_id, filename=filename)
+    # Load the weights
+    model.load_state_dict(torch.load(local_path, map_location="cpu", weights_only=True))
+    return model
+
 #####################################################################################################################
 #####################################################################################################################
 
@@ -434,13 +442,28 @@ def main(configs):
     }
 
     # 4. Load trained weights if already exists
-    if Path("./.tf_model_mnist/trained_model2/pytorch_pp_model_part2.bin").exists():
-        print("loading trained weights")
-        preprocess_model.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_pp_model_part2.bin", weights_only=True))
-        tf_model.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_tf_model_part2.bin", weights_only=True))
-        lin_class_m.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_class_lin_model_part2.bin", weights_only=True))
-    else:
-        print("No trained model, start from scratch.")
+    # if Path("./.tf_model_mnist/trained_model2/pytorch_pp_model_part2.bin").exists():
+    #     print("loading trained weights")
+    #     preprocess_model.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_pp_model_part2.bin", weights_only=True))
+    #     tf_model.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_tf_model_part2.bin", weights_only=True))
+    #     lin_class_m.load_state_dict(torch.load("./.tf_model_mnist/trained_model2/pytorch_class_lin_model_part2.bin", weights_only=True))
+    # else:
+    #     print("No trained model, start from scratch.")
+
+    # this is the second step, so expect these are avaialble
+    preprocess_model = download_and_load_weights(preprocess_model, "pytorch_pp_model.bin")
+    tf_model = download_and_load_weights(tf_model, "pytorch_tf_model.bin")
+    lin_class_m = download_and_load_weights(lin_class_m, "pytorch_class_lin_model.bin")    
+    print("Loaded trained model weights from hf repo successfully!")
+
+    # Freeze the weights (lock them)
+    for param in preprocess_model.parameters():
+        param.requires_grad = False
+    for param in tf_model.parameters():
+        param.requires_grad = False
+    for param in lin_class_m.parameters():
+        param.requires_grad = False
+    print("Model weights locked (frozen) successfully!")
 
     # 5. Train and validate
     print("training models"); 
