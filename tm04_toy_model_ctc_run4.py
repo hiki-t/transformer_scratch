@@ -10,6 +10,13 @@ import matplotlib.pyplot as plt
 import random
 
 from model_utils import MNISTTransformerModel
+import wandb
+
+###
+### setup device
+###
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ###
 ### set parameters
@@ -114,7 +121,7 @@ def add_blank_class_logits(logits_10, threshold=0.5, blank_boost=5.0):
     max_conf, _ = probs.max(dim=1)  # [T]
 
     # Default blank logit = small value
-    blank_logits = torch.full((logits_10.size(0), 1), fill_value=-10.0)
+    blank_logits = torch.full((logits_10.size(0), 1), fill_value=-10.0, device=logits_10.device)
 
     # Where confidence is low, boost blank logit
     high_blank_indices = max_conf < threshold
@@ -159,7 +166,7 @@ def create_sequence_image(img_batch, labels, seq_length=4, canvas_height=28):
         seq_labels = labels[start_idx:end_idx]  # [seq_length]
         
         # Create canvas
-        canvas = torch.ones((canvas_height, canvas_width))*img_batch.min()
+        canvas = torch.ones((canvas_height, canvas_width), device=device)*img_batch.min()
         
         # Position first digit
         pos = random.randint(0, 10)  # Random starting position
@@ -220,7 +227,11 @@ def ctc_greedy_decode(log_probs, blank=10):
 # load trained encoder model
 encoder = MNISTTransformerModel()
 # load decoder model
-decoder = SequenceDecoder(input_size=128, hidden_size=128, num_classes=11)  # 10 digits
+decoder = SequenceDecoder(input_size=128, hidden_size=128, num_classes=11).to(device) # 10 digits
+
+encoder.preprocess_model.to(device)
+encoder.tf_model.to(device)
+encoder.lin_class_m.to(device)
 
 # load data
 train_dataloader, test_dataloader = load_data(batch_size)
@@ -238,6 +249,11 @@ encoder.tf_model.eval()
 encoder.lin_class_m.eval()
 decoder.train()
 
+wandb.init(
+    project="vit_mnist_from_scratch3", 
+    entity="htsujimu-ucl",  # <--- set this to your username or team name
+)
+
 for epoch in range(num_epochs):
 
     total_digits = 0
@@ -245,10 +261,17 @@ for epoch in range(num_epochs):
     total_sequences = 0
     correct_sequences = 0
 
-    for (img, label) in train_dataloader:        
+    for (img, label) in train_dataloader:
+
+        img = img.to(device)
+        label = label.to(device)
+
         # Create sequence images
         sequence_images, sequence_labels = create_sequence_image(img, label, seq_length=seq_length)
-        
+
+        sequence_images = sequence_images.to(device)
+        sequence_labels = sequence_labels.to(device)
+
         batch_losses = []
         # Visualize a few sequences
         for i in range(sequence_images.shape[0]): # this will loop within a batch=16
@@ -257,17 +280,23 @@ for epoch in range(num_epochs):
             seq_img = sequence_images[i][0]
             seq_label = sequence_labels[i]
 
+            seq_img = seq_img.to(device)
+            seq_label = seq_label.to(device)
+
             _, _, pred_conf_10, pred_cls_out_10  = slide_seq_img_encode(seq_img, encoder, slide_size)
             conf_tensor = torch.tensor(pred_conf_10).unsqueeze(1)  # shape: [T, 1]
+            conf_tensor = conf_tensor.to(device)
+
             weighted_cls = conf_tensor * pred_cls_out_10
             decoder_output = decoder(weighted_cls.unsqueeze(0))  # [1, T, 10]
             log_probs = F.log_softmax(decoder_output, dim=2).transpose(0, 1)  # [T, 1, C]
+            log_probs = log_probs.to(device)
 
             loss = ctc_loss(
                 log_probs,
                 seq_label, 
-                input_lengths=torch.tensor([weighted_cls.size(0)], dtype=torch.long),
-                target_lengths=torch.tensor([seq_label.size(0)], dtype=torch.long)
+                input_lengths=torch.tensor([weighted_cls.size(0)], dtype=torch.long, device=device),
+                target_lengths=torch.tensor([seq_label.size(0)], dtype=torch.long, device=device)
             )
             optimizer.zero_grad()
             loss.backward()
@@ -295,6 +324,28 @@ for epoch in range(num_epochs):
     digit_acc = correct_digits / total_digits * 100
     sequence_acc = correct_sequences / total_sequences * 100
     print(f"Epoch {epoch} - Loss: {total_loss.item():.4f} | Digit Acc: {digit_acc:.2f}% | Sequence Acc: {sequence_acc:.2f}%")
+
+    # Log to wandb
+    wandb.log({"train/loss": total_loss, "train/accuracy-digit": digit_acc, "train/accuracy-seq": sequence_acc, "epoch": epoch+1})
+
+# 6. Save trained weights and push to HF
+print("save trained models")
+torch.save(decoder.state_dict(), "./.tf_model_mnist/trained_model3/pytorch_dec_model_part3.bin")
+
+print("push trained models to hf")
+# Set your repo name and user/org
+repo_id = configs["hf_repo"]
+api = HfApi()
+
+# If the repo doesn't exist, create it (only needs to be done once)
+api.create_repo(repo_id=repo_id, exist_ok=True)
+
+# push trained models to hf
+api.upload_file(
+    path_or_fileobj="./.tf_model_mnist/trained_model3/pytorch_dec_model_part3.bin",
+    path_in_repo="pytorch_pp_model_part3.bin",
+    repo_id=repo_id,
+)
 
 ### test
 
@@ -356,3 +407,8 @@ with torch.no_grad():
 digit_acc = correct_digits / total_digits * 100
 sequence_acc = correct_sequences / total_sequences * 100
 print(f"Test - Loss: {total_loss.item():.4f} | Digit Acc: {digit_acc:.2f}% | Sequence Acc: {sequence_acc:.2f}%")
+
+# Log to wandb
+wandb.log({"val/loss": total_loss, "val/accuracy-digit": digit_acc, "val/accuracy-seq": sequence_acc})
+
+wandb.finish()

@@ -32,3 +32,7 @@ Thumbs.db
 
 # debugging files
 .test
+
+myenv/
+test_data/
+train_data/
