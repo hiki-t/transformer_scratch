@@ -82,7 +82,8 @@ with tab2:
         help="Upload an image with a sequence of 4 handwritten digits (width=140, height=28)"
     )
     if uploaded_file is not None:
-        image_28x140 = uploaded_file.resize((140, 28), Image.Resampling.LANCZOS).convert("L")
+        image = Image.open(uploaded_file)
+        image_28x140 = image.resize((140, 28), Image.Resampling.LANCZOS).convert("L")
         st.image(image_28x140, caption="Resized for model (28x140)", width=448)
         if st.button("🔍 Predict Sequence", key="upload_predict", type="primary"):
             with st.spinner("Predicting..."):

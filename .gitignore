@@ -39,3 +39,4 @@ train_data/
 trained_models/
 wandb/
 .devcontainer
+test_img/
