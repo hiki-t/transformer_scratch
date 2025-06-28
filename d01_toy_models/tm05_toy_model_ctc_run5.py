@@ -358,7 +358,7 @@ api.create_repo(repo_id=repo_id, exist_ok=True)
 # push trained models to hf
 api.upload_file(
     path_or_fileobj="./.tf_model_mnist/trained_model3/pytorch_dec_model_part3.bin",
-    path_in_repo="pytorch_pp_model_part3.bin",
+    path_in_repo="pytorch_dec_model_part3.bin",
     repo_id=repo_id,
 )
 

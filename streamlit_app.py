@@ -153,20 +153,20 @@ with tab2:
         help="Upload an image with a sequence of 4 handwritten digits (width=112, height=28)"
     )
     if uploaded_file is not None:
-        image = Image.open(uploaded_file).convert("L")
-        image_28x112 = image.resize((112, 28), Image.Resampling.LANCZOS)
+        # image = Image.open(uploaded_file).convert("L")
+        image_28x112 = uploaded_file.resize((112, 28), Image.Resampling.LANCZOS)
         st.image(image_28x112, caption="Resized for model (28x112)", width=448)
         if st.button("🔍 Predict Sequence", key="upload_predict", type="primary"):
             with st.spinner("Predicting..."):
                 result = None
                 try:
-                    seq_img = np.array(image_28x112)
-                    seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
-                    seq_img = np.array(seq_img) / 255.0
-                    seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
-                    seq_img = seq_img.unsqueeze(0)
-                    seq_img = seq_img.squeeze(0)
-                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(seq_img, encoder, slide_size=8)
+                    # seq_img = np.array(image_28x112)
+                    # seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
+                    # seq_img = np.array(seq_img) / 255.0
+                    # seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
+                    # seq_img = seq_img.unsqueeze(0)
+                    # seq_img = seq_img.squeeze(0)
+                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(image_28x112, encoder, slide_size=8)
                     conf_tensor = torch.tensor(pred_conf_10).unsqueeze(1).to(device)
                     weighted_cls = conf_tensor * pred_cls_out_10
                     decoder_output = decoder(weighted_cls.unsqueeze(0))
