@@ -190,6 +190,68 @@ class DigitSequenceDecoder(nn.Module):
         logits = self.fc(out)        # [batch, seq_len, num_classes]
         return logits
 
+# --- SequenceDecoder and CTC decode ---
+class SequenceDecoder(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes):
+        super().__init__()
+        self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=2, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(hidden_size * 2, num_classes)
+
+    def forward(self, logits_seq):
+        out, _ = self.rnn(logits_seq)
+        out = self.fc(out)
+        return out
+
+def ctc_greedy_decode(log_probs, blank=10):
+    pred = torch.argmax(log_probs, dim=2).squeeze(1).tolist()
+    decoded = []
+    prev = None
+    for p in pred:
+        if p != blank and p != prev:
+            decoded.append(p)
+        prev = p
+    return decoded
+
+# --- Sliding window encoding ---
+def encode_patch(one_image, model):
+    img_embedded = model.preprocess_model(one_image)
+    transformer_output = model.tf_model(img_embedded)
+    cls_output = transformer_output[:, 0, :]
+    logits = model.lin_class_m(cls_output)
+    probs = torch.softmax(logits, dim=1)
+    pred = probs.argmax(dim=1)
+    confidence = probs[0, pred].item()
+    return logits, pred, confidence, cls_output
+
+def slide_seq_img_encode(seq_img, model, slide_size=8):
+    w_size = seq_img.shape[-1]
+    patch_size = seq_img.shape[0]
+    window_len = int((w_size - patch_size) / slide_size)
+    pred_per_digit_logit = []
+    pred_per_digit_pred = []
+    pred_per_digit_conf = []
+    pred_per_digit_cls_out = []
+    for j in range(window_len):
+        x_position = j * slide_size
+        crop_img = seq_img[:, x_position:x_position+patch_size].unsqueeze(0).unsqueeze(0)
+        logits, pred, confidence, cls_output = encode_patch(crop_img, model)
+        pred_per_digit_logit.append(logits)
+        pred_per_digit_pred.append(pred)
+        pred_per_digit_conf.append(confidence)
+        pred_per_digit_cls_out.append(cls_output)
+    pred_per_digit_logit = torch.stack(pred_per_digit_logit).squeeze(1)
+    pred_per_digit_cls_out = torch.stack(pred_per_digit_cls_out).squeeze(1)
+    return pred_per_digit_logit, pred_per_digit_pred, pred_per_digit_conf, pred_per_digit_cls_out
+
+def add_blank_class_logits(logits_10, threshold=0.5, blank_boost=5.0):
+    probs = F.softmax(logits_10, dim=1)
+    max_conf, _ = probs.max(dim=1)
+    blank_logits = torch.full((logits_10.size(0), 1), fill_value=-10.0, device=logits_10.device)
+    high_blank_indices = max_conf < threshold
+    blank_logits[high_blank_indices] = blank_boost
+    logits_11 = torch.cat([logits_10, blank_logits], dim=1)
+    return logits_11
+
 class MNISTTransformerModel:
     def __init__(self, model_path=".tf_model_mnist/trained_model/", seq_len=3):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
