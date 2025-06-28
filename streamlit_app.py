@@ -115,24 +115,24 @@ with tab1:
         background_color="#FFFFFF",
         update_streamlit=True,
         height=112,
-        width=448,
+        width=560,
         drawing_mode="freedraw",
         key="canvas_seq",
     )
     if canvas_result.image_data is not None:
         image = Image.fromarray(canvas_result.image_data)
-        image_28x112 = image.resize((112, 28), Image.Resampling.LANCZOS).convert("L")
-        st.image(image_28x112, caption="Resized for model (28x112)", width=448)
+        image_28x140 = image.resize((140, 28), Image.Resampling.LANCZOS).convert("L")
+        st.image(image_28x140, caption="Resized for model (28x140)", width=560)
         if st.button("🔍 Predict Sequence", key="draw_predict", type="primary"):
             with st.spinner("Predicting..."):
                 result = None
                 try:
-                    seq_img = np.array(image_28x112)
+                    seq_img = np.array(image_28x140)
                     seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
                     seq_img = np.array(seq_img) / 255.0
                     seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
-                    seq_img = seq_img.unsqueeze(0)  # [1, 28, 112]
-                    seq_img = seq_img.squeeze(0)    # [28, 112]
+                    # seq_img = seq_img.unsqueeze(0)  # [1, 28, 140]
+                    # seq_img = seq_img.squeeze(0)    # [28, 140]
                     # Sliding window encoding
                     _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(seq_img, encoder, slide_size=8)
                     conf_tensor = torch.tensor(pred_conf_10).unsqueeze(1).to(device)
