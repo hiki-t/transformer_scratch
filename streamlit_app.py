@@ -61,8 +61,8 @@ with tab1:
                     seq_img = np.array(image_28x140)
                     # seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
                     seq_img = np.array(seq_img) / 255.0
-                    seq_img = encoder.transform(seq_img).unsqueeze(0)
-                    # seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
+                    seq_img = encoder.transform(seq_img)
+                    seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
                     # seq_img = seq_img.unsqueeze(0)  # [1, 28, 140]
                     # seq_img = seq_img.squeeze(0)    # [28, 140]
 
