@@ -36,3 +36,5 @@ Thumbs.db
 myenv/
 test_data/
 train_data/
+trained_models/
+wandb/
