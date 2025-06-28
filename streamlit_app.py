@@ -63,7 +63,7 @@ with tab1:
                     seq_img = np.array(seq_img) / 255.0
                     seq_img = encoder.transform(seq_img)
                     seq_img = torch.tensor(seq_img, dtype=torch.float32).squeeze(0).to(device)
-                    st.write("seq_img shape:", seq_img.shape)
+                    st.write(f"seq_img max, min, mean, std: {seq_img.max()}, {seq_img.min()}, {seq_img.mean()}, {seq_img.std()}")
                     # seq_img = seq_img.unsqueeze(0)  # [1, 28, 140]
                     # seq_img = seq_img.squeeze(0)    # [28, 140]
 
