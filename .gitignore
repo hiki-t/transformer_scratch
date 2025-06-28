@@ -38,3 +38,4 @@ test_data/
 train_data/
 trained_models/
 wandb/
+.devcontainer
