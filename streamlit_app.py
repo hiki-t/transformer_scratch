@@ -58,17 +58,9 @@ with tab1:
                 try:
                     # ... after image is grayscale and 28x28
                     image_28x140 = ImageOps.invert(image_28x140)
-                    st.write(f"seq_img shape: {np.shape(image_28x140)}")
-                    # seq_img = np.array(image_28x140)
-                    # seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
-                    # seq_img = np.array(seq_img) / 255.0
                     seq_img = encoder.transform(image_28x140).to(device)
-                    st.write(f"seq_img shape: {seq_img.shape}")
                     seq_img = torch.tensor(seq_img, dtype=torch.float32).squeeze(0)
-                    st.write(f"seq_img shape: {seq_img.shape}")
-                    st.write(f"seq_img max, min, mean, std: {seq_img.max()}, {seq_img.min()}, {seq_img.mean()}, {seq_img.std()}")
-                    # seq_img = seq_img.unsqueeze(0)  # [1, 28, 140]
-                    # seq_img = seq_img.squeeze(0)    # [28, 140]
+                    # st.write(f"seq_img max, min, mean, std: {seq_img.max()}, {seq_img.min()}, {seq_img.mean()}, {seq_img.std()}")
 
                     # Sliding window encoding
                     _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(seq_img, encoder, slide_size=8)
@@ -90,20 +82,19 @@ with tab2:
         help="Upload an image with a sequence of 4 handwritten digits (width=140, height=28)"
     )
     if uploaded_file is not None:
-        # image = Image.open(uploaded_file).convert("L")
-        image_28x140 = uploaded_file.resize((140, 28), Image.Resampling.LANCZOS)
+        image_28x140 = uploaded_file.resize((140, 28), Image.Resampling.LANCZOS).convert("L")
         st.image(image_28x140, caption="Resized for model (28x140)", width=448)
         if st.button("🔍 Predict Sequence", key="upload_predict", type="primary"):
             with st.spinner("Predicting..."):
                 result = None
                 try:
-                    # seq_img = np.array(image_28x140)
-                    # seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
-                    # seq_img = np.array(seq_img) / 255.0
-                    # seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
-                    # seq_img = seq_img.unsqueeze(0)
-                    # seq_img = seq_img.squeeze(0)
-                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(image_28x140, encoder, slide_size=8)
+                    # ... after image is grayscale and 28x28
+                    image_28x140 = ImageOps.invert(image_28x140)
+                    seq_img = encoder.transform(image_28x140).to(device)
+                    seq_img = torch.tensor(seq_img, dtype=torch.float32).squeeze(0)
+
+                    # Sliding window encoding
+                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(seq_img, encoder, slide_size=8)
                     conf_tensor = torch.tensor(pred_conf_10).unsqueeze(1).to(device)
                     weighted_cls = conf_tensor * pred_cls_out_10
                     decoder_output = decoder(weighted_cls.unsqueeze(0))
