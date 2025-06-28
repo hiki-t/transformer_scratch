@@ -8,9 +8,12 @@ import torchvision.datasets as datasets
 
 import matplotlib.pyplot as plt
 import random
+from pathlib import Path
+from huggingface_hub import HfApi
+import wandb
+import tqdm
 
 from model_utils import MNISTTransformerModel
-import wandb
 
 ###
 ### setup device
@@ -25,7 +28,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 64
 seq_length=4
 slide_size=8
-num_epochs=2
+num_epochs=3
 lr=3e-4
 
 ###
@@ -48,7 +51,7 @@ def load_data(batch_size):
     mnist_trainset = datasets.MNIST(root='./test_data', train=True, download=True, transform=transform)
     mnist_testset = datasets.MNIST(root="./train_data", train=False, download=True, transform=transform_test)
 
-    train_dataloader = DataLoader(mnist_trainset, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(mnist_trainset, batch_size=batch_size, num_workers=6, pin_memory=True, shuffle=True)
     test_dataloader = DataLoader(mnist_testset, batch_size=batch_size, shuffle=True)
     return train_dataloader, test_dataloader
 
@@ -229,6 +232,13 @@ encoder = MNISTTransformerModel()
 # load decoder model
 decoder = SequenceDecoder(input_size=128, hidden_size=128, num_classes=11).to(device) # 10 digits
 
+# Load trained weights if already exists
+if Path("./.tf_model_mnist/trained_model3/pytorch_dec_model_part3.bin").exists():
+    print("loading trained weights")
+    decoder.load_state_dict(torch.load("./.tf_model_mnist/trained_model3/pytorch_dec_model_part3.bin", weights_only=True))
+else:
+    print("No trained model, start from scratch.")
+
 encoder.preprocess_model.to(device)
 encoder.tf_model.to(device)
 encoder.lin_class_m.to(device)
@@ -249,19 +259,22 @@ encoder.tf_model.eval()
 encoder.lin_class_m.eval()
 decoder.train()
 
-# wandb.init(
-#     project="vit_mnist_from_scratch3", 
-#     entity="htsujimu-ucl",  # <--- set this to your username or team name
-# )
+wandb.init(
+    project="vit_mnist_from_scratch3", 
+    entity="htsujimu-ucl",  # <--- set this to your username or team name
+)
 
+step = 0
 for epoch in range(num_epochs):
 
-    total_digits = 0
-    correct_digits = 0
-    total_sequences = 0
-    correct_sequences = 0
+    train_dataloader = tqdm.tqdm(train_dataloader, desc=f"Epoch {epoch + 1}", leave=False)
 
     for (img, label) in train_dataloader:
+        
+        total_digits = 0
+        correct_digits = 0
+        total_sequences = 0
+        correct_sequences = 0
 
         img = img.to(device)
         label = label.to(device)
@@ -320,13 +333,15 @@ for epoch in range(num_epochs):
             batch_losses.append(loss)
         
         total_loss = torch.stack(batch_losses).mean()
+        
+        digit_acc = correct_digits / total_digits * 100
+        sequence_acc = correct_sequences / total_sequences * 100
+        
+        # Log to wandb
+        wandb.log({"train/loss": total_loss, "train/accuracy-digit": digit_acc, "train/accuracy-seq": sequence_acc}, step = step)
+        step += 1
 
-    digit_acc = correct_digits / total_digits * 100
-    sequence_acc = correct_sequences / total_sequences * 100
     print(f"Epoch {epoch} - Loss: {total_loss.item():.4f} | Digit Acc: {digit_acc:.2f}% | Sequence Acc: {sequence_acc:.2f}%")
-
-    # # Log to wandb
-    # wandb.log({"train/loss": total_loss, "train/accuracy-digit": digit_acc, "train/accuracy-seq": sequence_acc, "epoch": epoch+1})
 
 # 6. Save trained weights and push to HF
 print("save trained models")
@@ -334,7 +349,7 @@ torch.save(decoder.state_dict(), "./.tf_model_mnist/trained_model3/pytorch_dec_m
 
 print("push trained models to hf")
 # Set your repo name and user/org
-repo_id = configs["hf_repo"]
+repo_id = "hiki-t/tf_model_mnist"
 api = HfApi()
 
 # If the repo doesn't exist, create it (only needs to be done once)
@@ -408,7 +423,7 @@ digit_acc = correct_digits / total_digits * 100
 sequence_acc = correct_sequences / total_sequences * 100
 print(f"Test - Loss: {total_loss.item():.4f} | Digit Acc: {digit_acc:.2f}% | Sequence Acc: {sequence_acc:.2f}%")
 
-# # Log to wandb
-# wandb.log({"val/loss": total_loss, "val/accuracy-digit": digit_acc, "val/accuracy-seq": sequence_acc})
+# Log to wandb
+wandb.log({"val/loss": total_loss, "val/accuracy-digit": digit_acc, "val/accuracy-seq": sequence_acc})
 
-# wandb.finish()
+wandb.finish()
