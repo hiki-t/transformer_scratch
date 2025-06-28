@@ -56,14 +56,14 @@ with tab1:
             with st.spinner("Predicting..."):
                 result = None
                 try:
-                    seq_img = np.array(image_28x140)
-                    seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
-                    seq_img = np.array(seq_img) / 255.0
-                    seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
+                    # seq_img = np.array(image_28x140)
+                    # seq_img = ImageOps.invert(Image.fromarray(seq_img)).convert("L")
+                    # seq_img = np.array(seq_img) / 255.0
+                    # seq_img = torch.tensor(seq_img, dtype=torch.float32).to(device)
                     # seq_img = seq_img.unsqueeze(0)  # [1, 28, 140]
                     # seq_img = seq_img.squeeze(0)    # [28, 140]
                     # Sliding window encoding
-                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(seq_img, encoder, slide_size=8)
+                    _, _, pred_conf_10, pred_cls_out_10 = slide_seq_img_encode(image_28x140, encoder, slide_size=8)
                     conf_tensor = torch.tensor(pred_conf_10).unsqueeze(1).to(device)
                     weighted_cls = conf_tensor * pred_cls_out_10
                     decoder_output = decoder(weighted_cls.unsqueeze(0))  # [1, T, 11]
